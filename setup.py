@@ -32,7 +32,7 @@ def read(fname):
 
 setuptools.setup(
     name=name,
-    version=setup.get_post_version('swiftclient'),
+    version=setup.get_version(name),
     description='Client Library for OpenStack Object Storage API',
     long_description=read('README.rst'),
     url='https://github.com/openstack/python-swiftclient',
@@ -46,6 +46,7 @@ setuptools.setup(
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
+        'Environment :: OpenStack',
         'Intended Audience :: Developers',
         'Intended Audience :: Information Technology',
         'License :: OSI Approved :: Apache Software License',
@@ -53,7 +54,6 @@ setuptools.setup(
         'Programming Language :: Python :: 2.6',
         'Environment :: No Input/Output (Daemon)',
     ],
-    test_suite='nose.collector',
     scripts=[
         'bin/swift',
     ],

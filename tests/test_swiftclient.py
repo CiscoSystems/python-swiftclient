@@ -14,6 +14,7 @@
 # limitations under the License.
 
 # TODO: More tests
+import httplib
 import socket
 import StringIO
 import testtools
@@ -123,7 +124,7 @@ class MockHttpTest(testtools.TestCase):
             return_read = kwargs.get('return_read')
             query_string = kwargs.get('query_string')
 
-            def wrapper(url, proxy=None):
+            def wrapper(url, proxy=None, ssl_compression=True):
                 parsed, _conn = _orig_http_connection(url, proxy=proxy)
                 conn = fake_http_connect(*args, **kwargs)()
 
@@ -182,7 +183,8 @@ class TestHttpHelpers(MockHttpTest):
         self.assertTrue(isinstance(conn, c.HTTPConnection))
         url = 'https://www.test.com'
         _junk, conn = c.http_connection(url)
-        self.assertTrue(isinstance(conn, c.HTTPSConnection))
+        self.assertTrue(isinstance(conn, httplib.HTTPSConnection) or
+                        isinstance(conn, c.HTTPSConnectionNoSSLComp))
         url = 'ftp://www.test.com'
         self.assertRaises(c.ClientException, c.http_connection, url)
 
@@ -354,6 +356,30 @@ class TestGetAccount(MockHttpTest):
         value = c.get_account('http://www.test.com', 'asdf')[1]
         self.assertEquals(value, [])
 
+    def test_param_marker(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&marker=marker")
+        c.get_account('http://www.test.com', 'asdf', marker='marker')
+
+    def test_param_limit(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&limit=10")
+        c.get_account('http://www.test.com', 'asdf', limit=10)
+
+    def test_param_prefix(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&prefix=asdf/")
+        c.get_account('http://www.test.com', 'asdf', prefix='asdf/')
+
+    def test_param_end_marker(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&end_marker=end_marker")
+        c.get_account('http://www.test.com', 'asdf', end_marker='end_marker')
+
 
 class TestHeadAccount(MockHttpTest):
 
@@ -371,7 +397,7 @@ class TestHeadAccount(MockHttpTest):
         self.assertRaises(c.ClientException, c.head_account,
                           'http://www.tests.com', 'asdf')
         try:
-            value = c.head_account('http://www.tests.com', 'asdf')
+            c.head_account('http://www.tests.com', 'asdf')
         except c.ClientException as e:
             new_body = "[first 60 chars of response] " + body[0:60]
             self.assertEquals(e.__str__()[-89:], new_body)
@@ -384,6 +410,44 @@ class TestGetContainer(MockHttpTest):
         value = c.get_container('http://www.test.com', 'asdf', 'asdf')[1]
         self.assertEquals(value, [])
 
+    def test_param_marker(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&marker=marker")
+        c.get_container('http://www.test.com', 'asdf', 'asdf', marker='marker')
+
+    def test_param_limit(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&limit=10")
+        c.get_container('http://www.test.com', 'asdf', 'asdf', limit=10)
+
+    def test_param_prefix(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&prefix=asdf/")
+        c.get_container('http://www.test.com', 'asdf', 'asdf', prefix='asdf/')
+
+    def test_param_delimiter(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&delimiter=/")
+        c.get_container('http://www.test.com', 'asdf', 'asdf', delimiter='/')
+
+    def test_param_end_marker(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&end_marker=end_marker")
+        c.get_container('http://www.test.com', 'asdf', 'asdf',
+                        end_marker='end_marker')
+
+    def test_param_path(self):
+        c.http_connection = self.fake_http_connection(
+            204,
+            query_string="format=json&path=asdf")
+        c.get_container('http://www.test.com', 'asdf', 'asdf',
+                        path='asdf')
+
 
 class TestHeadContainer(MockHttpTest):
 
@@ -394,7 +458,7 @@ class TestHeadContainer(MockHttpTest):
                           'http://www.test.com', 'asdf', 'asdf',
                           )
         try:
-            value = c.head_container('http://www.test.com', 'asdf', 'asdf')
+            c.head_container('http://www.test.com', 'asdf', 'asdf')
         except c.ClientException as e:
             self.assertEquals(e.http_response_content, body)
 
@@ -413,7 +477,7 @@ class TestPutContainer(MockHttpTest):
                           'http://www.test.com', 'asdf', 'asdf',
                           )
         try:
-            value = c.put_container('http://www.test.com', 'asdf', 'asdf')
+            c.put_container('http://www.test.com', 'asdf', 'asdf')
         except c.ClientException as e:
             self.assertEquals(e.http_response_content, body)
 
@@ -501,7 +565,7 @@ class TestPutObject(MockHttpTest):
         args = ('http://www.test.com', 'asdf', 'asdf', 'asdf', 'asdf')
         self.assertRaises(c.ClientException, c.put_object, *args)
         try:
-            value = c.put_object(*args)
+            c.put_object(*args)
         except c.ClientException as e:
             self.assertEquals(e.http_response_content, body)
 
@@ -517,7 +581,7 @@ class TestPostObject(MockHttpTest):
     def test_ok(self):
         c.http_connection = self.fake_http_connection(200)
         args = ('http://www.test.com', 'asdf', 'asdf', 'asdf', {})
-        value = c.post_object(*args)
+        c.post_object(*args)
 
     def test_unicode_ok(self):
         conn = c.http_connection(u'http://www.test.com/')
@@ -542,7 +606,7 @@ class TestPostObject(MockHttpTest):
         args = ('http://www.test.com', 'asdf', 'asdf', 'asdf', {})
         self.assertRaises(c.ClientException, c.post_object, *args)
         try:
-            value = c.post_object(*args)
+            c.post_object(*args)
         except c.ClientException as e:
             self.assertEquals(e.http_response_content, body)
 
@@ -551,7 +615,7 @@ class TestDeleteObject(MockHttpTest):
 
     def test_ok(self):
         c.http_connection = self.fake_http_connection(200)
-        value = c.delete_object('http://www.test.com', 'asdf', 'asdf', 'asdf')
+        c.delete_object('http://www.test.com', 'asdf', 'asdf', 'asdf')
 
     def test_server_error(self):
         c.http_connection = self.fake_http_connection(500)
@@ -572,16 +636,16 @@ class TestConnection(MockHttpTest):
         self.assertEquals(conn.retries, 5)
 
     def test_instance_kwargs(self):
-        args = {'user':  'ausername',
-                'key':  'secretpass',
-                'authurl':  'http://www.test.com',
-                'tenant_name':  'atenant'}
+        args = {'user': 'ausername',
+                'key': 'secretpass',
+                'authurl': 'http://www.test.com',
+                'tenant_name': 'atenant'}
         conn = c.Connection(**args)
         self.assertEquals(type(conn), c.Connection)
 
     def test_instance_kwargs_token(self):
         args = {'preauthtoken': 'atoken123',
-                'preauthurl':  'http://www.test.com:8080/v1/AUTH_123456'}
+                'preauthurl': 'http://www.test.com:8080/v1/AUTH_123456'}
         conn = c.Connection(**args)
         self.assertEquals(type(conn), c.Connection)
 
@@ -625,7 +689,7 @@ class TestConnection(MockHttpTest):
             except AssertionError:
                 msg = '%s did not read resp on server error' % method.__name__
                 self.fail(msg)
-            except Exception, e:
+            except Exception as e:
                 raise e.__class__("%s - %s" % (method.__name__, e))
 
     def test_reauth(self):
@@ -650,7 +714,7 @@ class TestConnection(MockHttpTest):
         self.assertEquals(conn.url, 'http://www.old.com')
         self.assertEquals(conn.token, 'old')
 
-        value = conn.head_account()
+        conn.head_account()
 
         self.assertTrue(self.swap_sleep_called)
         self.assertEquals(conn.attempts, 2)
@@ -713,7 +777,7 @@ class TestConnection(MockHttpTest):
             def read(self, *args, **kwargs):
                 return ''
 
-        def local_http_connection(url, proxy=None):
+        def local_http_connection(url, proxy=None, ssl_compression=True):
             parsed = urlparse(url)
             return parsed, LocalConnection()
 
@@ -727,7 +791,7 @@ class TestConnection(MockHttpTest):
             exc = None
             try:
                 conn.put_object('c', 'o', contents)
-            except socket.error, err:
+            except socket.error as err:
                 exc = err
             self.assertEquals(contents.seeks, [0])
             self.assertEquals(str(exc), 'oops')
@@ -736,7 +800,7 @@ class TestConnection(MockHttpTest):
             exc = None
             try:
                 conn.put_object('c', 'o', contents)
-            except socket.error, err:
+            except socket.error as err:
                 exc = err
             self.assertEquals(contents.seeks, [123])
             self.assertEquals(str(exc), 'oops')
@@ -746,7 +810,7 @@ class TestConnection(MockHttpTest):
             exc = None
             try:
                 conn.put_object('c', 'o', contents)
-            except c.ClientException, err:
+            except c.ClientException as err:
                 exc = err
             self.assertEquals(contents.seeks, [])
             self.assertEquals(str(exc), "put_object('c', 'o', ...) failure "
